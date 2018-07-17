@@ -11,7 +11,7 @@ import json
 import signal
 import struct
 import tempfile
-from random import randint
+from random import randint, uniform
 from os import listdir
 from os.path import isfile, join
 from Crypto.Cipher import AES
@@ -287,7 +287,7 @@ class ExfiltrateFile(threading.Thread):
             self.jobid, os.path.basename(self.file_to_send), self.checksum)
         plugin_send_function(data)
 
-        time_to_sleep = randint(1, MAX_TIME_SLEEP)
+        time_to_sleep = uniform(0, MAX_TIME_SLEEP)
         info("Sleeping for %s seconds" % time_to_sleep)
         time.sleep(time_to_sleep)
 
@@ -313,7 +313,7 @@ class ExfiltrateFile(threading.Thread):
             plugin_send_function(data)
             packet_index = packet_index + 1
 
-            time_to_sleep = randint(1, MAX_TIME_SLEEP)
+            time_to_sleep = uniform(0, MAX_TIME_SLEEP)
             display_message("Sleeping for %s seconds" % time_to_sleep)
             time.sleep(time_to_sleep)
 
@@ -368,7 +368,7 @@ def main():
     ok("CTRL+C to kill DET")
 
     MIN_TIME_SLEEP = int(config['min_time_sleep'])
-    MAX_TIME_SLEEP = int(config['max_time_sleep'])
+    MAX_TIME_SLEEP = float(config['max_time_sleep'])
     MIN_BYTES_READ = int(config['min_bytes_read'])
     MAX_BYTES_READ = int(config['max_bytes_read'])
     COMPRESSION    = bool(config['compression'])
