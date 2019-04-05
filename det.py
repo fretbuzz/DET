@@ -224,6 +224,12 @@ class Exfiltration(object):
     def retrieve_data(self, data):
         global files
         try:
+
+            try:
+                data = data['from_file']
+            except:
+                pass
+
             message = data
             if (message.count("|!|") >= 2):
                 info("Received {0} bytes".format(len(message)))
@@ -366,8 +372,7 @@ def mimir_DET_client(path, file_to_exfil):
     ## TODO: step (1) : consruct request for more of the data
         ## okay, sketched above...
     ## TODO: step (2) : be able to decipher the end information somehow...
-        ## note: w/ more thought... wouldn't this be a seperated process/function
-        ## and maybe I could leverage existing capabilities somehow??
+        ## added below...
     pass
 
 def main():
@@ -393,6 +398,8 @@ def main():
                         dest="proxy", default=False, help="Proxy mode")
     listenMode.add_argument('-M', action="store_true",
                             dest="microservice", default=False, help="Special Model for MS applicatinos")
+    listenMode.add_argument('-LM', action="store_true",
+                            dest="list_microservice", default=False, help="Special Listen Model for MS applications")
     results = parser.parse_args()
 
     if (results.config is None):
@@ -431,7 +438,13 @@ def main():
         plugins = app.get_plugins()
         plugin = plugins[0]
         thread = threading.Thread(target=plugins[plugin]['microserivce_proxy'], args=(app,))
-        #thread = ExfiltrateFile(app, file_to_send)
+        threads.append(thread)
+        thread.daemon = True
+        thread.start()
+    elif True:
+        plugins = app.get_plugins()
+        plugin = plugins[0]
+        thread = threading.Thread(target=plugins[plugin]['listen_ms'], args=(app,))
         threads.append(thread)
         thread.daemon = True
         thread.start()
