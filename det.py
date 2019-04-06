@@ -278,14 +278,8 @@ class ExfiltrateFile(threading.Thread):
 
         data, f = get_next_data(self.file_to_send, packet_index, plugin_name, None, self.exfiltrate.KEY, self.jobid)
         plugin_send_function(data)
-
-<<<<<<< HEAD
         packet_index += 1
-
         time_to_sleep = uniform(0, MAX_TIME_SLEEP)
-=======
-        time_to_sleep = randint(1, MAX_TIME_SLEEP)
->>>>>>> parent of 232ba4e... allows less waiting to be possible
         info("Sleeping for %s seconds" % time_to_sleep)
         time.sleep(time_to_sleep)
 
@@ -296,12 +290,7 @@ class ExfiltrateFile(threading.Thread):
             plugin_name, plugin_send_function = self.exfiltrate.get_random_plugin()
             plugin_send_function(data)
             packet_index = packet_index + 1
-<<<<<<< HEAD
             time_to_sleep = uniform(0, MAX_TIME_SLEEP)
-=======
-
-            time_to_sleep = randint(1, MAX_TIME_SLEEP)
->>>>>>> parent of 232ba4e... allows less waiting to be possible
             display_message("Sleeping for %s seconds" % time_to_sleep)
             time.sleep(time_to_sleep)
 
