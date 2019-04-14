@@ -441,7 +441,7 @@ def main():
         threads.append(thread)
         thread.daemon = True
         thread.start()
-    elif True:
+    elif results.list_microservice:
         plugins = app.get_plugins()
         plugin = plugins[0]
         thread = threading.Thread(target=plugins[plugin]['listen_ms'], args=(app,))

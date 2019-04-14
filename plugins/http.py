@@ -121,7 +121,6 @@ def proxy():
 ## TODO: add dnscat capabilities here IMHO --- I honestly kinda forget how dnscat even works...
 ## todo: update headers (maybe take from config file or something like that) -- yah definitely... figure them out in advance??
     ## (but in an automated way...)
-## todo: write new ms_sender function or something like that
 ## todo: TEST!!!
 
 def microserivce_proxy(exfil_object):
