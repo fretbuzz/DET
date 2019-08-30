@@ -15,7 +15,7 @@ import tempfile
 from random import randint, uniform
 from os import listdir
 from os.path import isfile, join
-from pycryptodome.Cipher import AES
+from Crypto.Cipher import AES
 from zlib import compress, decompress
 import requests
 
