@@ -225,6 +225,7 @@ class Exfiltration(object):
         global files
         try:
 
+            # expresssion to match
             try:
                 data = data['from_file']
             except:
@@ -397,9 +398,9 @@ def main():
     listenMode.add_argument('-Z', action="store_true",
                         dest="proxy", default=False, help="Proxy mode")
     listenMode.add_argument('-M', action="store_true",
-                            dest="microservice", default=False, help="Special Model for MS applicatinos")
+                            dest="microservice", default=False, help="Special Mode for MS applicatinos")
     listenMode.add_argument('-LM', action="store_true",
-                            dest="list_microservice", default=False, help="Special Listen Model for MS applications")
+                            dest="list_microservice", default=False, help="Special Listen Mode for MS applications")
     results = parser.parse_args()
 
     if (results.config is None):
@@ -435,19 +436,21 @@ def main():
             thread.start()
             threads.append(thread)
     elif results.microservice:
+        threads = []
         plugins = app.get_plugins()
         plugin = plugins[0]
         thread = threading.Thread(target=plugins[plugin]['microserivce_proxy'], args=(app,))
-        threads.append(thread)
         thread.daemon = True
         thread.start()
+        threads.append(thread)
     elif results.list_microservice:
+        threads = []
         plugins = app.get_plugins()
         plugin = plugins[0]
         thread = threading.Thread(target=plugins[plugin]['listen_ms'], args=(app,))
-        threads.append(thread)
         thread.daemon = True
         thread.start()
+        threads.append(thread)
     # EXFIL mode
     else:
         if (results.folder is None and results.file is None):
